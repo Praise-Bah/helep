@@ -1,0 +1,118 @@
+global:
+  imageRegistry: ""
+  imagePullPolicy: IfNotPresent
+  kafkaBootstrap: "helep-kafka-kafka-bootstrap.helep.svc.cluster.local:9092"
+  jwtSecret: "change-me-in-production-use-a-strong-random-secret"
+  matcher: "nearest"
+
+user-service:
+  enabled: true
+  image:
+    repository: helep/user-service
+    tag: "1.0.0"
+  replicaCount: 2
+  service:
+    port: 8001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+sos-service:
+  enabled: true
+  image:
+    repository: helep/sos-service
+    tag: "1.0.0"
+  replicaCount: 2
+  service:
+    port: 8002
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+dispatch-service:
+  enabled: true
+  image:
+    repository: helep/dispatch-service
+    tag: "1.0.0"
+  replicaCount: 2
+  service:
+    port: 8003
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+notification-service:
+  enabled: true
+  image:
+    repository: helep/notification-service
+    tag: "1.0.0"
+  replicaCount: 2
+  service:
+    port: 8004
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+analytics-service:
+  enabled: true
+  image:
+    repository: helep/analytics-service
+    tag: "1.0.0"
+  replicaCount: 2
+  service:
+    port: 8005
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: helep-config
+  namespace: helep
+  labels:
+    app.kubernetes.io/part-of: helep
+data:
+  KAFKA_BOOTSTRAP: "helep-kafka-kafka-bootstrap.helep.svc.cluster.local:9092"
+  USER_SERVICE_PORT: "8001"
+  SOS_SERVICE_PORT: "8002"
+  DISPATCH_SERVICE_PORT: "8003"
+  NOTIFICATION_SERVICE_PORT: "8004"
+  ANALYTICS_SERVICE_PORT: "8005"
+  MATCHER: "nearest"

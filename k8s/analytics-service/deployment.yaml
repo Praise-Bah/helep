@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: helep
+  labels:
+    app: analytics-service
+    app.kubernetes.io/part-of: helep
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8005"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+        - name: analytics-service
+          image: helep/analytics-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8005
+              name: http
+          env:
+            - name: KAFKA_BOOTSTRAP
+              valueFrom:
+                configMapKeyRef:
+                  name: helep-config
+                  key: KAFKA_BOOTSTRAP
+            - name: SERVICE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: helep-config
+                  key: ANALYTICS_SERVICE_PORT
+            - name: DB_PATH
+              value: /data/analytics.db
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8005
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8005
+            initialDelaySeconds: 25
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: analytics-service-data

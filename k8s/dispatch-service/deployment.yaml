@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dispatch-service
+  namespace: helep
+  labels:
+    app: dispatch-service
+    app.kubernetes.io/part-of: helep
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dispatch-service
+  template:
+    metadata:
+      labels:
+        app: dispatch-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8003"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+        - name: dispatch-service
+          image: helep/dispatch-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8003
+              name: http
+          env:
+            - name: KAFKA_BOOTSTRAP
+              valueFrom:
+                configMapKeyRef:
+                  name: helep-config
+                  key: KAFKA_BOOTSTRAP
+            - name: SERVICE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: helep-config
+                  key: DISPATCH_SERVICE_PORT
+            - name: DB_PATH
+              value: /data/dispatch.db
+            - name: MATCHER
+              valueFrom:
+                configMapKeyRef:
+                  name: helep-config
+                  key: MATCHER
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8003
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8003
+            initialDelaySeconds: 25
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: dispatch-service-data

@@ -1,0 +1,51 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: helep-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: helep
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - http:
+        paths:
+          - path: /api/users(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: {{ index .Values "user-service" "service" "port" }}
+          - path: /api/sos(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: sos-service
+                port:
+                  number: {{ index .Values "sos-service" "service" "port" }}
+          - path: /api/dispatch(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: dispatch-service
+                port:
+                  number: {{ index .Values "dispatch-service" "service" "port" }}
+          - path: /api/notifications(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: notification-service
+                port:
+                  number: {{ index .Values "notification-service" "service" "port" }}
+          - path: /api/analytics(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: analytics-service
+                port:
+                  number: {{ index .Values "analytics-service" "service" "port" }}
+{{- end }}

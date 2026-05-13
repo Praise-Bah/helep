@@ -1,0 +1,6 @@
+apiVersion: v2
+name: sos-service
+description: HELEP sos-service sub-chart (SOS trigger, cancel)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

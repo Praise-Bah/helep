@@ -1,0 +1,6 @@
+apiVersion: v2
+name: dispatch-service
+description: HELEP dispatch-service sub-chart (responder matching, danger zones)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

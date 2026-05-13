@@ -1,0 +1,171 @@
+name: HELEP CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_PREFIX: ${{ secrets.DOCKERHUB_USERNAME }}/helep
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [user-service, sos-service, dispatch-service, notification-service, analytics-service]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r services/${{ matrix.service }}/requirements.txt
+          pip install ruff pytest pytest-asyncio
+
+      - name: Lint with ruff
+        run: ruff check services/${{ matrix.service }}/app/
+
+      - name: Run tests (if any)
+        run: |
+          if [ -d "services/${{ matrix.service }}/tests" ]; then
+            pytest services/${{ matrix.service }}/tests/ -v
+          else
+            echo "No tests directory found for ${{ matrix.service }} — skipping"
+          fi
+
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    strategy:
+      matrix:
+        service: [user-service, sos-service, dispatch-service, notification-service, analytics-service]
+        include:
+          - service: user-service
+            port: 8001
+          - service: sos-service
+            port: 8002
+          - service: dispatch-service
+            port: 8003
+          - service: notification-service
+            port: 8004
+          - service: analytics-service
+            port: 8005
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: services/${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  helm-lint:
+    name: Helm Chart Lint
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: "v3.14.0"
+
+      - name: Lint Helm chart
+        run: helm lint helm/helep-chart/
+
+      - name: Template Helm chart (dry-run)
+        run: |
+          helm template helep helm/helep-chart/ \
+            --namespace helep \
+            --set global.jwtSecret=test-secret \
+            > /tmp/helep-manifests.yaml
+          echo "Generated $(wc -l < /tmp/helep-manifests.yaml) lines of manifests"
+
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: [build-and-push, helm-lint]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: "v3.14.0"
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install helep helm/helep-chart/ \
+            --namespace helep \
+            --create-namespace \
+            --set global.jwtSecret="${{ secrets.JWT_SECRET }}" \
+            --set user-service.image.tag="main-${{ steps.sha.outputs.short }}" \
+            --set sos-service.image.tag="main-${{ steps.sha.outputs.short }}" \
+            --set dispatch-service.image.tag="main-${{ steps.sha.outputs.short }}" \
+            --set notification-service.image.tag="main-${{ steps.sha.outputs.short }}" \
+            --set analytics-service.image.tag="main-${{ steps.sha.outputs.short }}" \
+            --wait \
+            --timeout 10m \
+            --atomic
+
+      - name: Smoke test — health checks
+        run: |
+          kubectl rollout status deployment/user-service -n helep --timeout=120s
+          kubectl rollout status deployment/sos-service -n helep --timeout=120s
+          kubectl rollout status deployment/dispatch-service -n helep --timeout=120s
+          kubectl rollout status deployment/notification-service -n helep --timeout=120s
+          kubectl rollout status deployment/analytics-service -n helep --timeout=120s
+          echo "All deployments healthy!"

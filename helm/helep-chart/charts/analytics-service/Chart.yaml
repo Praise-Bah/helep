@@ -1,0 +1,6 @@
+apiVersion: v2
+name: analytics-service
+description: HELEP analytics-service sub-chart (police stats, zone heatmaps)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

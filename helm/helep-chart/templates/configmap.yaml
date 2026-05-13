@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: helep-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: helep
+data:
+  KAFKA_BOOTSTRAP: {{ .Values.global.kafkaBootstrap | quote }}
+  MATCHER: {{ .Values.global.matcher | quote }}
